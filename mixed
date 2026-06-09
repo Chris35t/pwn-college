@@ -1,0 +1,329 @@
+# Mixed Conversions Cheat Sheet (Python)
+
+## Decimal ↔ Binary
+
+### Decimal → 8-bit Binary
+
+```python
+n = 184
+format(n, '08b')
+
+# 10111000
+```
+
+### Binary → Decimal
+
+```python
+int("10111000", 2)
+
+# 184
+```
+
+---
+
+## Decimal ↔ Hex
+
+### Decimal → Hex
+
+```python
+hex(184)
+
+# 0xb8
+```
+
+Without prefix:
+
+```python
+format(184, '02x')
+
+# b8
+```
+
+### Hex → Decimal
+
+```python
+int("b8", 16)
+
+# 184
+```
+
+---
+
+## Binary ↔ Hex
+
+### Binary → Hex
+
+```python
+hex(int("10111000", 2))
+
+# 0xb8
+```
+
+### Hex → Binary
+
+```python
+format(int("b8", 16), '08b')
+
+# 10111000
+```
+
+---
+
+# Two's Complement (8-bit)
+
+Range:
+
+```text
+Unsigned: 0..255
+Signed:  -128..127
+```
+
+---
+
+## Unsigned → Signed
+
+```python
+u = 184
+
+signed = u - 256 if u >= 128 else u
+
+print(signed)
+
+# -72
+```
+
+---
+
+## Signed → Unsigned
+
+```python
+s = -72
+
+unsigned = s + 256 if s < 0 else s
+
+print(unsigned)
+
+# 184
+```
+
+---
+
+## Signed → Binary
+
+```python
+s = -72
+
+format((s + 256) % 256, '08b')
+
+# 10111000
+```
+
+---
+
+## Signed → Hex
+
+```python
+s = -72
+
+hex((s + 256) % 256)
+
+# 0xb8
+```
+
+---
+
+## Binary → Signed
+
+```python
+b = "10111000"
+
+u = int(b, 2)
+
+signed = u - 256 if u >= 128 else u
+
+print(signed)
+
+# -72
+```
+
+---
+
+## Hex → Signed
+
+```python
+h = "b8"
+
+u = int(h, 16)
+
+signed = u - 256 if u >= 128 else u
+
+print(signed)
+
+# -72
+```
+
+---
+
+# One-Liners
+
+## Binary → Hex
+
+```python
+hex(int(binary, 2))
+```
+
+## Hex → Binary
+
+```python
+format(int(hexstr, 16), '08b')
+```
+
+## Binary → Unsigned
+
+```python
+int(binary, 2)
+```
+
+## Hex → Unsigned
+
+```python
+int(hexstr, 16)
+```
+
+## Unsigned → Binary
+
+```python
+format(n, '08b')
+```
+
+## Unsigned → Hex
+
+```python
+hex(n)
+```
+
+## Unsigned → Signed
+
+```python
+n - 256 if n >= 128 else n
+```
+
+## Signed → Unsigned
+
+```python
+n + 256 if n < 0 else n
+```
+
+## Signed → Binary
+
+```python
+format((n + 256) % 256, '08b')
+```
+
+## Signed → Hex
+
+```python
+hex((n + 256) % 256)
+```
+
+---
+
+# Examples from pwn.college
+
+## Example 1
+
+```text
+11011001 [binary]
+```
+
+```python
+u = int("11011001", 2)
+# 217
+
+hex(u)
+# 0xd9
+
+u - 256
+# -39
+```
+
+---
+
+## Example 2
+
+```text
+208 [unsigned]
+```
+
+```python
+hex(208)
+# 0xd0
+
+format(208, '08b')
+# 11010000
+
+208 - 256
+# -48
+```
+
+---
+
+## Example 3
+
+```text
+ee [hex]
+```
+
+```python
+u = int("ee", 16)
+# 238
+
+format(u, '08b')
+# 11101110
+
+u - 256
+# -18
+```
+
+---
+
+## Example 4
+
+```text
+-72 [signed]
+```
+
+```python
+u = -72 + 256
+# 184
+
+hex(u)
+# 0xb8
+
+format(u, '08b')
+# 10111000
+```
+
+---
+
+# Ultimate Formula
+
+```text
+Binary -> Unsigned:
+    int(binary, 2)
+
+Hex -> Unsigned:
+    int(hex, 16)
+
+Unsigned -> Signed:
+    n - 256 if n >= 128 else n
+
+Signed -> Unsigned:
+    n + 256 if n < 0 else n
+
+Unsigned -> Binary:
+    format(n, '08b')
+
+Unsigned -> Hex:
+    hex(n)
+```
