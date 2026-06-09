@@ -1,0 +1,391 @@
+# Reverse Engineering & CTF Conversion Cheat Sheet
+
+## Binary ↔ Decimal
+
+### Binary → Decimal
+
+```python
+int("10110110", 2)
+# 182
+```
+
+### Decimal → Binary
+
+```python
+bin(182)
+# '0b10110110'
+```
+
+8-bit format:
+
+```python
+format(182, '08b')
+# '10110110'
+```
+
+---
+
+## Hex ↔ Decimal
+
+### Hex → Decimal
+
+```python
+int("b6", 16)
+# 182
+```
+
+### Decimal → Hex
+
+```python
+hex(182)
+# '0xb6'
+```
+
+Without prefix:
+
+```python
+format(182, 'x')
+# 'b6'
+```
+
+---
+
+## Binary ↔ Hex
+
+### Binary → Hex
+
+```python
+hex(int("10110110", 2))
+# '0xb6'
+```
+
+### Hex → Binary
+
+```python
+format(int("b6", 16), '08b')
+# '10110110'
+```
+
+---
+
+## ASCII
+
+### Character → Decimal
+
+```python
+ord('A')
+# 65
+```
+
+### Decimal → Character
+
+```python
+chr(65)
+# 'A'
+```
+
+### String → Bytes
+
+```python
+b"flag"
+```
+
+### Bytes → String
+
+```python
+b"flag".decode()
+```
+
+---
+
+## String ↔ Hex
+
+### String → Hex
+
+```python
+"flag".encode().hex()
+# '666c6167'
+```
+
+### Hex → String
+
+```python
+bytes.fromhex("666c6167").decode()
+# 'flag'
+```
+
+---
+
+## Bytes ↔ Integer
+
+### Bytes → Integer
+
+```python
+int.from_bytes(b"\x01\x02", "big")
+# 258
+```
+
+```python
+int.from_bytes(b"\x01\x02", "little")
+# 513
+```
+
+### Integer → Bytes
+
+```python
+(258).to_bytes(2, "big")
+# b'\x01\x02'
+```
+
+---
+
+## Endianness
+
+### Little Endian
+
+```python
+b"\x78\x56\x34\x12"
+```
+
+represents
+
+```text
+0x12345678
+```
+
+Python:
+
+```python
+int.from_bytes(b"\x78\x56\x34\x12", "little")
+```
+
+### Big Endian
+
+```python
+int.from_bytes(b"\x12\x34\x56\x78", "big")
+```
+
+---
+
+## Two's Complement (8-bit)
+
+### Signed → Binary
+
+```python
+format((-74) & 0xff, '08b')
+# 10110110
+```
+
+### Binary → Signed
+
+```python
+x = int("10110110", 2)
+x - 256 if x & 0x80 else x
+# -74
+```
+
+---
+
+## Two's Complement (General)
+
+### Signed Integer → N-bit Binary
+
+```python
+n = -10
+bits = 8
+
+format(n & ((1 << bits) - 1), f'0{bits}b')
+```
+
+### Binary → Signed Integer
+
+```python
+bits = 8
+x = int("11110110", 2)
+
+if x & (1 << (bits - 1)):
+    x -= (1 << bits)
+
+print(x)
+# -10
+```
+
+---
+
+## XOR
+
+### Integer XOR
+
+```python
+0x41 ^ 0x20
+# 97
+```
+
+### Byte XOR
+
+```python
+bytes([a ^ b for a, b in zip(data, key)])
+```
+
+### Single-byte XOR
+
+```python
+bytes(c ^ 0x41 for c in data)
+```
+
+---
+
+## Base64
+
+### Encode
+
+```python
+import base64
+
+base64.b64encode(b"flag")
+```
+
+### Decode
+
+```python
+base64.b64decode("ZmxhZw==")
+```
+
+---
+
+## URL Encoding
+
+### Encode
+
+```python
+from urllib.parse import quote
+
+quote("flag{test}")
+```
+
+### Decode
+
+```python
+from urllib.parse import unquote
+
+unquote("%66%6c%61%67")
+```
+
+---
+
+## Struct Packing
+
+### Pack Integer
+
+```python
+import struct
+
+struct.pack("<I", 0x12345678)
+```
+
+### Unpack Integer
+
+```python
+struct.unpack("<I", b"\x78\x56\x34\x12")
+```
+
+---
+
+## Useful Reverse Engineering One-Liners
+
+### Hex Dump
+
+```python
+data.hex()
+```
+
+### Printable Strings
+
+```python
+''.join(chr(c) for c in data if 32 <= c <= 126)
+```
+
+### Byte Frequency
+
+```python
+from collections import Counter
+
+Counter(data)
+```
+
+### Reverse Bytes
+
+```python
+data[::-1]
+```
+
+### MD5
+
+```python
+import hashlib
+
+hashlib.md5(data).hexdigest()
+```
+
+### SHA256
+
+```python
+hashlib.sha256(data).hexdigest()
+```
+
+---
+
+## pwntools Shortcuts
+
+```python
+from pwn import *
+
+p32(0x12345678)
+u32(b"\x78\x56\x34\x12")
+
+p64(0xdeadbeef)
+u64(data)
+```
+
+---
+
+## Common Bit Values
+
+```text
+128 64 32 16 8 4 2 1
+```
+
+```text
+10000000 = 128
+01000000 = 64
+00100000 = 32
+00010000 = 16
+00001000 = 8
+00000100 = 4
+00000010 = 2
+00000001 = 1
+```
+
+---
+
+## Two's Complement Quick Reference
+
+```text
+11111111 = -1
+11111110 = -2
+11111101 = -3
+
+10000000 = -128
+
+01111111 = 127
+```
+
+### Formula
+
+```text
+MSB = 0:
+    signed = unsigned
+
+MSB = 1:
+    signed = unsigned - 256
+```
