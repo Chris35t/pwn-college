@@ -1,0 +1,479 @@
+# x86-64 Assembly Control Flow & Calling Convention Cheat Sheet
+
+## Basic Function Structure
+
+### Executable
+
+```asm
+.intel_syntax noprefix
+.global _start
+
+_start:
+    ; code
+
+    mov rax, 60
+    xor rdi, rdi
+    syscall
+```
+
+### Shared Library Function
+
+```asm
+.intel_syntax noprefix
+.global solve
+
+solve:
+    ; code
+    ret
+```
+
+---
+
+# Linux Syscalls
+
+| Syscall | rax |
+| ------- | --- |
+| read    | 0   |
+| write   | 1   |
+| open    | 2   |
+| exit    | 60  |
+
+## write(fd, buf, size)
+
+```asm
+mov rdi, 1      ; stdout
+mov rsi, buffer
+mov rdx, size
+mov rax, 1
+syscall
+```
+
+## exit(code)
+
+```asm
+mov rdi, 0
+mov rax, 60
+syscall
+```
+
+---
+
+# Function Calling Convention (SysV x86-64)
+
+## Arguments
+
+| Argument | Register |
+| -------- | -------- |
+| 1st      | rdi      |
+| 2nd      | rsi      |
+| 3rd      | rdx      |
+| 4th      | rcx      |
+| 5th      | r8       |
+| 6th      | r9       |
+
+## Return Value
+
+```text
+rax
+```
+
+Example:
+
+```c
+foo(1,2,3);
+```
+
+```asm
+mov rdi, 1
+mov rsi, 2
+mov rdx, 3
+call foo
+```
+
+---
+
+# Returning Values
+
+## return x;
+
+```asm
+mov rax, rdi
+ret
+```
+
+Equivalent:
+
+```c
+long solve(long x)
+{
+    return x;
+}
+```
+
+---
+
+# cmp + setz
+
+## if (a == b)
+
+```asm
+cmp rdi, 42
+setz dil
+```
+
+Result:
+
+```text
+dil = 1 if equal
+dil = 0 otherwise
+```
+
+---
+
+# Conditional Jumps
+
+## if (a != b)
+
+```asm
+cmp rdi, 42
+jne fail
+```
+
+## if (a == b)
+
+```asm
+cmp rdi, 42
+je success
+```
+
+Pattern:
+
+```asm
+cmp rdi, 42
+jne fail
+
+success:
+    mov rdi, 0
+    ret
+
+fail:
+    mov rdi, 1
+    ret
+```
+
+---
+
+# Loops
+
+Pattern:
+
+```asm
+loop:
+    ; work
+
+    cmp something, something
+    je done
+
+    jmp loop
+
+done:
+```
+
+String comparison:
+
+```asm
+loop:
+    mov al, [rsi]
+    cmp [rdi], al
+    jne fail
+
+    cmp al, 0
+    je success
+
+    inc rdi
+    inc rsi
+
+    jmp loop
+```
+
+---
+
+# Function Pointers
+
+Given:
+
+```text
+rdi = function pointer
+```
+
+Call it:
+
+```asm
+call rdi
+ret
+```
+
+Equivalent:
+
+```c
+callback();
+```
+
+---
+
+# Function Pointer With Arguments
+
+Given:
+
+```text
+rdi = callback pointer
+```
+
+Need:
+
+```c
+callback(1337);
+```
+
+Solution:
+
+```asm
+mov rax, rdi
+mov rdi, 1337
+call rax
+ret
+```
+
+---
+
+# Caller-Saved Registers
+
+These may be destroyed by a function call:
+
+```text
+rax
+rcx
+rdx
+rsi
+rdi
+r8
+r9
+r10
+r11
+```
+
+Save before call:
+
+```asm
+push rax
+push rcx
+push rdx
+...
+call func
+...
+pop rdx
+pop rcx
+pop rax
+```
+
+---
+
+# Callee-Saved Registers
+
+Must be restored before returning:
+
+```text
+rbx
+rbp
+r12
+r13
+r14
+r15
+```
+
+Pattern:
+
+```asm
+push rbx
+push r12
+push r13
+push r14
+push r15
+
+; modify them
+
+pop r15
+pop r14
+pop r13
+pop r12
+pop rbx
+
+ret
+```
+
+---
+
+# Stack Rules
+
+## Push
+
+```asm
+push rax
+```
+
+Stores value on stack.
+
+## Pop
+
+```asm
+pop rax
+```
+
+Restores value.
+
+### LIFO
+
+```text
+Last In
+First Out
+```
+
+Example:
+
+```asm
+push rbx
+push r12
+
+pop r12
+pop rbx
+```
+
+Correct.
+
+---
+
+# argc / argv Layout
+
+Program start:
+
+```text
+[rsp]      = argc
+[rsp+8]    = argv[0]
+[rsp+16]   = argv[1]
+[rsp+24]   = argv[2]
+```
+
+Read argc:
+
+```asm
+mov rdi, [rsp]
+```
+
+Read argv[1]:
+
+```asm
+mov rdi, [rsp+16]
+```
+
+First character:
+
+```asm
+mov al, [rdi]
+```
+
+---
+
+# Jump Tables
+
+Pattern:
+
+```asm
+xor eax, eax
+mov al, [rcx]
+mov rax, [rax*8 + table]
+jmp rax
+```
+
+Meaning:
+
+```c
+goto jump_table[input];
+```
+
+Useful GDB:
+
+```gdb
+x/a ADDRESS
+x/20a ADDRESS
+```
+
+---
+
+# GDB Quick Commands
+
+## Disassembly
+
+```gdb
+disas
+```
+
+## Registers
+
+```gdb
+info registers
+```
+
+## Examine memory
+
+```gdb
+x/16bx ADDRESS
+```
+
+## Strings
+
+```gdb
+x/s ADDRESS
+```
+
+## Addresses
+
+```gdb
+x/a ADDRESS
+```
+
+## Step instruction
+
+```gdb
+si
+```
+
+## Next instruction
+
+```gdb
+ni
+```
+
+## Breakpoint
+
+```gdb
+b *0x401000
+```
+
+---
+
+# Mental Checklist
+
+Before every CALL:
+
+1. Which register contains the function pointer?
+2. Which registers contain arguments?
+3. Which caller-saved registers must survive?
+4. Do I need to push them?
+
+Before every RET:
+
+1. Did I restore all callee-saved registers?
+2. Is rax holding the return value?
+3. Is the stack balanced?
+
+These questions solve most control-flow and calling-convention challenges.
