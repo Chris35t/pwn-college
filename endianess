@@ -1,0 +1,436 @@
+# x86-64 Endianness, Memory Layout & Reversing Cheat Sheet
+
+## Endianness
+
+### Little Endian (x86/x86-64)
+
+Multi-byte values are stored with the **least significant byte first**.
+
+Example:
+
+```text
+Value:
+0x12345678
+
+Memory:
+78 56 34 12
+```
+
+---
+
+### Big Endian
+
+```text
+Value:
+0x12345678
+
+Memory:
+12 34 56 78
+```
+
+---
+
+## Memory → Register
+
+### WORD (2 bytes)
+
+Memory:
+
+```text
+34 12
+```
+
+Instruction:
+
+```asm
+mov ax, [rdi]
+```
+
+Register:
+
+```text
+ax = 0x1234
+```
+
+---
+
+### DWORD (4 bytes)
+
+Memory:
+
+```text
+78 56 34 12
+```
+
+Instruction:
+
+```asm
+mov eax, [rdi]
+```
+
+Register:
+
+```text
+eax = 0x12345678
+```
+
+---
+
+### QWORD (8 bytes)
+
+Memory:
+
+```text
+88 77 66 55 44 33 22 11
+```
+
+Instruction:
+
+```asm
+mov rax, [rdi]
+```
+
+Register:
+
+```text
+rax = 0x1122334455667788
+```
+
+---
+
+# Size Reference
+
+| Name  | Bits | Bytes | Register |
+| ----- | ---- | ----- | -------- |
+| byte  | 8    | 1     | al       |
+| word  | 16   | 2     | ax       |
+| dword | 32   | 4     | eax      |
+| qword | 64   | 8     | rax      |
+
+---
+
+# Register Hierarchy
+
+```text
+rax = 64 bits
+
+┌──────────────────────────────┐
+│            rax               │
+└──────────────────────────────┘
+
+            eax (32 bits)
+
+                ax (16 bits)
+
+                 al (8 bits)
+```
+
+Example:
+
+```text
+rax = 1122334455667788
+
+eax =         55667788
+
+ax  =             7788
+
+al  =               88
+```
+
+---
+
+# Python Conversion Cheat Sheet
+
+## BYTE
+
+```python
+bytes([0x41])
+```
+
+Output:
+
+```text
+b'A'
+```
+
+---
+
+## WORD
+
+```python
+print(0x1234.to_bytes(2,"little"))
+```
+
+Output:
+
+```text
+b'4\x12'
+```
+
+ASCII example:
+
+```python
+print(0x7079.to_bytes(2,"little"))
+```
+
+Output:
+
+```text
+b'yp'
+```
+
+---
+
+## DWORD
+
+```python
+print(0x44434241.to_bytes(4,"little"))
+```
+
+Output:
+
+```text
+b'ABCD'
+```
+
+---
+
+## QWORD
+
+```python
+print(0x4847464544434241.to_bytes(8,"little"))
+```
+
+Output:
+
+```text
+b'ABCDEFGH'
+```
+
+---
+
+# Reversing Passwords
+
+## QWORD Challenge
+
+Assembly:
+
+```asm
+movabs rbx,0x7334547a62415538
+cmp rax,rbx
+```
+
+Python:
+
+```python
+print(0x7334547a62415538.to_bytes(8,"little").decode())
+```
+
+Output:
+
+```text
+8UAbzT4s
+```
+
+---
+
+## DWORD Challenge
+
+Assembly:
+
+```asm
+cmp eax,0x4e457236
+cmp eax,0x52594e56
+cmp eax,0x69363270
+cmp eax,0x4b367764
+```
+
+Python:
+
+```python
+print(
+    (
+        0x4e457236.to_bytes(4,"little") +
+        0x52594e56.to_bytes(4,"little") +
+        0x69363270.to_bytes(4,"little") +
+        0x4b367764.to_bytes(4,"little")
+    ).decode()
+)
+```
+
+---
+
+## WORD Challenge
+
+Assembly:
+
+```asm
+cmp ax,0x7079
+cmp ax,0x6d6d
+cmp ax,0x3641
+```
+
+Python:
+
+```python
+print(
+    (
+        0x7079.to_bytes(2,"little") +
+        0x6d6d.to_bytes(2,"little") +
+        0x3641.to_bytes(2,"little")
+    ).decode()
+)
+```
+
+---
+
+# Memory Map Method (Most Important)
+
+Given:
+
+```asm
+cmp eax,[rdi+0x8]
+cmp ax,[rdi+0xc]
+cmp al,[rdi+0xe]
+```
+
+Create a table:
+
+```text
+Offset:
+
+00 01 02 03 04 05 06 07
+08 09 0A 0B
+0C 0D
+0E
+0F
+```
+
+Fill each offset with decoded bytes.
+
+Read from:
+
+```text
+00 → 0F
+```
+
+NOT:
+
+```text
+comparison order
+```
+
+---
+
+# Scrambled Struct Solver Template
+
+```python
+pw = bytearray(16)
+
+pw[0:8]   = VALUE1.to_bytes(8,"little")
+pw[8:12]  = VALUE2.to_bytes(4,"little")
+pw[12:14] = VALUE3.to_bytes(2,"little")
+pw[14]    = VALUE4
+pw[15]    = VALUE5
+
+print(pw.decode())
+```
+
+---
+
+# Generic One-Liners
+
+## Decode QWORD
+
+```python
+print(HEX.to_bytes(8,"little").decode())
+```
+
+---
+
+## Decode DWORD
+
+```python
+print(HEX.to_bytes(4,"little").decode())
+```
+
+---
+
+## Decode WORD
+
+```python
+print(HEX.to_bytes(2,"little").decode())
+```
+
+---
+
+## Decode BYTE
+
+```python
+print(chr(HEX))
+```
+
+---
+
+# GDB Memory Interpretation
+
+### Bytes
+
+```gdb
+x/16bx ADDRESS
+```
+
+### String
+
+```gdb
+x/s ADDRESS
+```
+
+### Addresses
+
+```gdb
+x/a ADDRESS
+```
+
+### QWORDs
+
+```gdb
+x/4gx ADDRESS
+```
+
+---
+
+# Quick Mental Rules
+
+### Register Size → Python Size
+
+```text
+al  -> 1 byte  -> bytes([x])
+
+ax  -> 2 bytes -> to_bytes(2,"little")
+
+eax -> 4 bytes -> to_bytes(4,"little")
+
+rax -> 8 bytes -> to_bytes(8,"little")
+```
+
+### Reversing Rule
+
+```text
+Read size from register.
+Decode using that size.
+Place bytes at the correct offset.
+Reconstruct memory.
+```
+
+### Never Do
+
+```text
+Use comparison order.
+```
+
+### Always Do
+
+```text
+Use memory offsets.
+```
