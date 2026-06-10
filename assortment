@@ -1,0 +1,472 @@
+# pwn.college Assembly Assortment Cheat Sheet
+
+## Function Template
+
+```asm
+.intel_syntax noprefix
+.global solve
+
+solve:
+    ; code
+    ret
+```
+
+### Calling Convention
+
+| Purpose      | Register |
+| ------------ | -------- |
+| 1st argument | rdi      |
+| 2nd argument | rsi      |
+| Return value | rax      |
+
+---
+
+# Bitwise Operations
+
+## AND (`&`)
+
+Keeps bits where mask has 1s.
+
+```asm
+and rax, MASK
+```
+
+Examples:
+
+```asm
+and rax, 1
+```
+
+Keep lowest bit.
+
+```asm
+and rax, 0xff
+```
+
+Keep lowest byte.
+
+```asm
+and rax, 0xffff
+```
+
+Keep lowest 16 bits.
+
+### Mental Rule
+
+```text
+AND = KEEP
+```
+
+---
+
+## OR (`|`)
+
+Turns bits on.
+
+```asm
+or rax, MASK
+```
+
+Example:
+
+```asm
+or rax, 0x20
+```
+
+Set ASCII case bit.
+
+### Mental Rule
+
+```text
+OR = SET
+```
+
+---
+
+## XOR (`^`)
+
+Flips bits.
+
+```asm
+xor rax, MASK
+```
+
+Examples:
+
+```asm
+xor rax, 1
+```
+
+Swap 0 and 1.
+
+```asm
+xor al, 0x20
+```
+
+Toggle ASCII case.
+
+### Mental Rule
+
+```text
+XOR = TOGGLE
+```
+
+---
+
+# ASCII Case Tricks
+
+## Uppercase → Lowercase
+
+```asm
+or al, 0x20
+```
+
+Example:
+
+```text
+A -> a
+P -> p
+```
+
+---
+
+## Lowercase → Uppercase
+
+```asm
+and al, 0xdf
+```
+
+Example:
+
+```text
+a -> A
+p -> P
+```
+
+---
+
+## Toggle Case
+
+```asm
+xor al, 0x20
+```
+
+Example:
+
+```text
+A -> a
+a -> A
+```
+
+---
+
+# String Loops
+
+## Uppercase String
+
+```asm
+loop:
+    mov al, [rdi]
+    cmp al, 0
+    je done
+
+    and al, 0xdf
+    mov [rdi], al
+
+    inc rdi
+    jmp loop
+
+done:
+    ret
+```
+
+---
+
+## Lowercase String
+
+```asm
+loop:
+    mov al, [rdi]
+    cmp al, 0
+    je done
+
+    or al, 0x20
+    mov [rdi], al
+
+    inc rdi
+    jmp loop
+
+done:
+    ret
+```
+
+---
+
+## Swap Case String
+
+```asm
+loop:
+    mov al, [rdi]
+    cmp al, 0
+    je done
+
+    xor al, 0x20
+    mov [rdi], al
+
+    inc rdi
+    jmp loop
+
+done:
+    ret
+```
+
+---
+
+# Parity (Even/Odd)
+
+## Return 1 if Even, 0 if Odd
+
+```asm
+mov rax, rdi
+and rax, 1
+xor rax, 1
+ret
+```
+
+Python:
+
+```python
+return (x & 1) ^ 1
+```
+
+---
+
+# LOBYTE
+
+Return lowest byte.
+
+```asm
+mov rax, rdi
+and rax, 0xff
+ret
+```
+
+Python:
+
+```python
+return x & 0xff
+```
+
+---
+
+# Shifts
+
+## Left Shift
+
+```asm
+shl rax, N
+```
+
+Equivalent:
+
+```text
+x * 2^N
+```
+
+Examples:
+
+```asm
+shl rax, 1
+```
+
+Multiply by 2.
+
+```asm
+shl rax, 4
+```
+
+Multiply by 16.
+
+---
+
+## Right Shift
+
+```asm
+shr rax, N
+```
+
+Equivalent:
+
+```text
+x / 2^N
+```
+
+Examples:
+
+```asm
+shr rax, 1
+```
+
+Divide by 2.
+
+```asm
+shr rax, 8
+```
+
+Move second byte to lowest position.
+
+---
+
+# Extracting Bytes
+
+Given:
+
+```text
+11 22 33 44 55 66 77 88
+```
+
+## Lowest Byte
+
+```asm
+and rax, 0xff
+```
+
+Result:
+
+```text
+88
+```
+
+---
+
+## Second Byte
+
+```asm
+shr rax, 8
+and rax, 0xff
+```
+
+Result:
+
+```text
+77
+```
+
+---
+
+## Third Byte
+
+```asm
+shr rax, 16
+and rax, 0xff
+```
+
+Result:
+
+```text
+66
+```
+
+---
+
+## Fourth Byte
+
+```asm
+shr rax, 24
+and rax, 0xff
+```
+
+Result:
+
+```text
+55
+```
+
+---
+
+# Useful Masks
+
+| Purpose        | Mask       |
+| -------------- | ---------- |
+| Lowest bit     | 0x1        |
+| Lowest nibble  | 0xf        |
+| Lowest byte    | 0xff       |
+| Lowest 16 bits | 0xffff     |
+| Lowest 32 bits | 0xffffffff |
+
+---
+
+# Reversing Cheat Sheet
+
+## ADD Challenge
+
+```asm
+add al, K
+cmp al, TARGET
+```
+
+Reverse:
+
+```python
+input = TARGET - K
+```
+
+---
+
+## SUB Challenge
+
+```asm
+sub al, K
+cmp al, TARGET
+```
+
+Reverse:
+
+```python
+input = TARGET + K
+```
+
+---
+
+## XOR Challenge
+
+```asm
+xor al, K
+cmp al, TARGET
+```
+
+Reverse:
+
+```python
+input = TARGET ^ K
+```
+
+---
+
+# Common Register Sizes
+
+| Register | Bits | Bytes |
+| -------- | ---- | ----- |
+| al       | 8    | 1     |
+| ax       | 16   | 2     |
+| eax      | 32   | 4     |
+| rax      | 64   | 8     |
+
+---
+
+# Mental Model
+
+```text
+AND  -> KEEP bits
+OR   -> SET bits
+XOR  -> TOGGLE bits
+
+SHL  -> Multiply by powers of 2
+SHR  -> Divide by powers of 2
+
+[rdi] -> memory pointed to by rdi
+rdi   -> the pointer itself
+
+ret -> return to caller
+rax -> return value
+```
