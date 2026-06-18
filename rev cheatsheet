@@ -1,0 +1,816 @@
+# CTF Reverse Engineering Cheat Sheet (Noob → Advanced)
+
+This is the workflow many top CTF players follow when they encounter an unknown reversing challenge.
+
+---
+
+# 0. First Rule
+
+**Never start with Ghidra immediately.**
+
+Always perform basic reconnaissance first.
+
+```bash
+file chall
+checksec chall
+strings chall | less
+```
+
+Look for:
+
+* Flag format
+* Passwords
+* URLs
+* Error messages
+* Function names
+* Hidden strings
+
+---
+
+# 1. Basic Triage
+
+## Linux Binary
+
+```bash
+file chall
+```
+
+Example:
+
+```text
+ELF 64-bit LSB executable
+```
+
+---
+
+## Windows Binary
+
+```bash
+file chall.exe
+```
+
+Example:
+
+```text
+PE32 executable
+```
+
+---
+
+## Android
+
+```bash
+file app.apk
+```
+
+Use:
+
+```bash
+jadx-gui app.apk
+```
+
+---
+
+## .NET
+
+```bash
+file chall.exe
+```
+
+Look for:
+
+```text
+Mono/.NET
+```
+
+Use:
+
+```bash
+dnSpy
+ILSpy
+```
+
+---
+
+## Java
+
+```bash
+file chall.jar
+```
+
+Use:
+
+```bash
+jd-gui
+jadx
+```
+
+---
+
+# 2. Protection Checks
+
+## Linux
+
+```bash
+checksec chall
+```
+
+Look for:
+
+```text
+Canary
+NX
+PIE
+RELRO
+```
+
+Mostly useful in pwn/rev hybrids.
+
+---
+
+# 3. String Hunting
+
+90% of beginner rev challenges die here.
+
+```bash
+strings chall
+```
+
+Better:
+
+```bash
+strings -n 5 chall
+```
+
+Search:
+
+```bash
+strings chall | grep flag
+strings chall | grep CTF
+strings chall | grep password
+```
+
+---
+
+# 4. Detect Packing
+
+## UPX
+
+```bash
+strings chall | grep UPX
+```
+
+or
+
+```bash
+upx -t chall
+```
+
+Unpack:
+
+```bash
+upx -d chall
+```
+
+---
+
+## Packed PE
+
+Use:
+
+```text
+PEStudio
+Detect It Easy (DIE)
+```
+
+---
+
+# 5. Static Analysis
+
+## Open in Ghidra
+
+Find:
+
+```text
+main()
+WinMain()
+entry()
+```
+
+---
+
+## Rename Variables
+
+Bad:
+
+```c
+local_10
+local_20
+```
+
+Good:
+
+```c
+user_input
+flag
+key
+```
+
+Renaming makes life easier.
+
+---
+
+# 6. Typical CTF Patterns
+
+---
+
+## XOR
+
+Most common.
+
+Example:
+
+```c
+flag[i] ^ key
+```
+
+Look for:
+
+```asm
+xor
+```
+
+or
+
+```c
+^
+```
+
+Solve:
+
+```python
+enc=[...]
+key=0x42
+
+print(''.join(chr(x^key) for x in enc))
+```
+
+---
+
+## Multi-byte XOR
+
+```python
+key=b"secret"
+```
+
+```python
+for i,b in enumerate(enc):
+    print(chr(b^key[i%len(key)]),end='')
+```
+
+---
+
+## Caesar
+
+```python
+for shift in range(26):
+```
+
+Try all shifts.
+
+---
+
+## Base64
+
+Look for:
+
+```text
+ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/
+```
+
+Decode:
+
+```python
+import base64
+```
+
+---
+
+## Hex
+
+```python
+bytes.fromhex(data)
+```
+
+---
+
+## ROT13
+
+```python
+import codecs
+```
+
+```python
+codecs.decode(data,"rot13")
+```
+
+---
+
+## RC4
+
+Indicators:
+
+```text
+256-byte array
+KSA
+PRGA
+```
+
+---
+
+## AES
+
+Indicators:
+
+```text
+AES
+Rijndael
+Crypto
+```
+
+Search key nearby.
+
+---
+
+# 7. Compare Function Trick
+
+Very common.
+
+Example:
+
+```c
+if(strcmp(input,"secret"))
+```
+
+or
+
+```c
+memcmp()
+```
+
+Find:
+
+```text
+strcmp
+strncmp
+memcmp
+```
+
+See what it's comparing.
+
+---
+
+# 8. Length Checks
+
+Look for:
+
+```c
+strlen(input)
+```
+
+Example:
+
+```c
+if(strlen(input)!=32)
+```
+
+Immediately know:
+
+```text
+Flag length = 32
+```
+
+---
+
+# 9. Character Checks
+
+Example:
+
+```c
+flag[0]=='C'
+flag[1]=='T'
+flag[2]=='F'
+```
+
+Reconstruct manually.
+
+---
+
+# 10. Math Constraints
+
+Example:
+
+```c
+a+b=100
+a-b=20
+```
+
+Use:
+
+```python
+from z3 import *
+```
+
+---
+
+# 11. Z3 Solver
+
+Install:
+
+```bash
+pip install z3-solver
+```
+
+Template:
+
+```python
+from z3 import *
+
+x=BitVec('x',8)
+
+s=Solver()
+s.add(x+5==100)
+
+print(s.check())
+print(s.model())
+```
+
+---
+
+# 12. Dynamic Analysis
+
+---
+
+## Linux
+
+```bash
+gdb ./chall
+```
+
+Useful:
+
+```gdb
+disas main
+b main
+run
+ni
+si
+x/s
+```
+
+---
+
+## Pwndbg
+
+Install:
+
+```bash
+pwndbg
+```
+
+Useful:
+
+```gdb
+context
+telescope
+```
+
+---
+
+# 13. Catch Flag During Runtime
+
+Break before comparison:
+
+```gdb
+b strcmp
+run
+```
+
+When hit:
+
+```gdb
+x/s $rdi
+x/s $rsi
+```
+
+Often reveals flag.
+
+---
+
+# 14. Trace Program
+
+```bash
+ltrace ./chall
+```
+
+Shows:
+
+```text
+strcmp()
+memcmp()
+puts()
+```
+
+---
+
+```bash
+strace ./chall
+```
+
+Shows:
+
+```text
+open()
+read()
+```
+
+---
+
+# 15. Patch Binary
+
+Use:
+
+### Ghidra
+
+or
+
+### radare2
+
+Change:
+
+```asm
+jne
+```
+
+to
+
+```asm
+je
+```
+
+or
+
+```asm
+nop
+nop
+```
+
+---
+
+# 16. Radare2 Essentials
+
+```bash
+r2 chall
+```
+
+Analyze:
+
+```bash
+aaa
+```
+
+Functions:
+
+```bash
+afl
+```
+
+Disassemble:
+
+```bash
+pdf @ main
+```
+
+Strings:
+
+```bash
+iz
+```
+
+Cross references:
+
+```bash
+axt
+```
+
+---
+
+# 17. APK Reversing
+
+```bash
+apktool d app.apk
+jadx-gui app.apk
+```
+
+Search:
+
+```text
+flag
+password
+checkFlag
+verify
+```
+
+---
+
+# 18. Native Libraries
+
+APK:
+
+```text
+lib/arm64-v8a/*.so
+```
+
+Open in Ghidra.
+
+Search:
+
+```text
+JNI_OnLoad
+Java_*
+```
+
+---
+
+# 19. .NET Reversing
+
+Open:
+
+```text
+dnSpy
+```
+
+Often source code visible directly.
+
+---
+
+# 20. Unity Games
+
+Files:
+
+```text
+Assembly-CSharp.dll
+```
+
+Open:
+
+```text
+dnSpy
+```
+
+Search:
+
+```text
+flag
+password
+secret
+```
+
+---
+
+# 21. Common CTF Rev Patterns
+
+### XOR
+
+Very common
+
+### Base64
+
+Very common
+
+### RC4
+
+Common
+
+### AES
+
+Moderate
+
+### State Machine
+
+Common
+
+### Custom VM
+
+Hard
+
+### Self-modifying
+
+Hard
+
+### Symbolic Constraints
+
+Very common
+
+### Obfuscated JavaScript
+
+Very common
+
+---
+
+# 22. When Stuck
+
+Ask:
+
+### Where is input read?
+
+Find:
+
+```text
+scanf
+fgets
+cin
+getline
+read
+```
+
+---
+
+### Where is input checked?
+
+Find:
+
+```text
+strcmp
+memcmp
+if
+switch
+```
+
+---
+
+### What must be true?
+
+Extract constraints.
+
+---
+
+# 23. Fastest Workflow
+
+```bash
+file chall
+checksec chall
+strings chall
+```
+
+Then:
+
+```bash
+ltrace chall
+```
+
+Then:
+
+```bash
+ghidra
+```
+
+Then:
+
+```bash
+gdb
+```
+
+Then:
+
+```bash
+z3
+```
+
+---
+
+# 24. Tools Every CTF Reverser Should Know
+
+* Ghidra
+* radare2
+* Cutter
+* GDB
+* pwndbg
+* Binary Ninja
+* IDA Free
+* jadx
+* apktool
+* dnSpy
+* x64dbg
+* Detect It Easy
+
+# Golden Rule
+
+For almost every rev challenge, answer these 4 questions:
+
+1. **Where is input taken?**
+2. **How is it transformed?**
+3. **How is it verified?**
+4. **Can I reverse the transformation or bypass verification?**
+
+
