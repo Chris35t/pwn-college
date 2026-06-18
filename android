@@ -1,0 +1,667 @@
+# Android Reversing CTF Cheat Sheet
+
+## 0. First Commands
+
+```bash
+file app.apk
+unzip -l app.apk | less
+apktool d app.apk -o apk_out
+jadx-gui app.apk
+```
+
+Look for:
+
+```text
+flag
+CTF
+password
+secret
+check
+verify
+native
+JNI
+```
+
+---
+
+## 1. Main Tools
+
+```bash
+jadx-gui app.apk          # Java/Kotlin decompile
+apktool d app.apk         # resources + smali
+adb install app.apk       # install app
+adb logcat                # logs
+frida                    # runtime hook
+objection                # easier Frida
+ghidra                   # native .so analysis
+```
+
+---
+
+## 2. APK Structure
+
+```text
+AndroidManifest.xml       # activities, permissions
+classes.dex               # app code
+resources.arsc            # resources
+res/                      # strings/layouts
+assets/                   # hidden files
+lib/arm64-v8a/*.so        # native libraries
+META-INF/                 # signing info
+```
+
+---
+
+## 3. Manifest Recon
+
+```bash
+aapt dump badging app.apk
+aapt dump xmltree app.apk AndroidManifest.xml
+```
+
+Check:
+
+```text
+package name
+main activity
+exported activities
+permissions
+deep links
+debuggable=true
+```
+
+---
+
+## 4. Search Everything
+
+```bash
+grep -Rni "flag\|ctf\|secret\|password\|key\|check\|verify" apk_out/
+```
+
+In JADX search for:
+
+```text
+flag
+checkFlag
+verify
+validate
+success
+wrong
+Base64
+AES
+Cipher
+MessageDigest
+native
+System.loadLibrary
+```
+
+---
+
+## 5. Java/Kotlin Easy Wins
+
+Look for:
+
+```java
+if (input.equals("secret"))
+```
+
+or:
+
+```java
+String flag = "CTF{...}";
+```
+
+Also check:
+
+```java
+getString(R.string.secret)
+```
+
+Then open:
+
+```text
+res/values/strings.xml
+```
+
+---
+
+## 6. Base64 / Hex / ROT
+
+Common patterns:
+
+```java
+Base64.decode(...)
+Integer.parseInt(hex, 16)
+StringBuilder.reverse()
+```
+
+Python decode:
+
+```python
+import base64
+print(base64.b64decode("..."))
+print(bytes.fromhex("..."))
+```
+
+---
+
+## 7. Crypto Checks
+
+Search:
+
+```text
+Cipher.getInstance
+AES
+DES
+RC4
+MessageDigest
+SHA-256
+MD5
+SecretKeySpec
+IvParameterSpec
+```
+
+Find:
+
+```text
+key
+iv
+ciphertext
+salt
+```
+
+Common solve:
+
+```python
+from Crypto.Cipher import AES
+from Crypto.Util.Padding import unpad
+
+key = b"..."
+iv = b"..."
+ct = bytes.fromhex("...")
+
+print(unpad(AES.new(key, AES.MODE_CBC, iv).decrypt(ct), 16))
+```
+
+---
+
+## 8. SharedPreferences
+
+Apps often hide values here.
+
+```bash
+adb shell run-as com.package.name
+cd /data/data/com.package.name/shared_prefs
+cat *.xml
+```
+
+Or:
+
+```bash
+adb shell
+su
+cat /data/data/com.package.name/shared_prefs/*.xml
+```
+
+---
+
+## 9. Assets
+
+Always check:
+
+```bash
+ls apk_out/assets
+find apk_out/assets -type f -maxdepth 2
+file apk_out/assets/*
+strings apk_out/assets/*
+```
+
+Hidden flags often live in:
+
+```text
+assets/
+raw/
+res/raw/
+```
+
+---
+
+## 10. Smali Patching
+
+Decode:
+
+```bash
+apktool d app.apk -o apk_out
+```
+
+Find wrong check:
+
+```smali
+if-eqz v0, :wrong
+```
+
+Patch to success:
+
+```smali
+goto :success
+```
+
+Rebuild:
+
+```bash
+apktool b apk_out -o patched.apk
+```
+
+Sign:
+
+```bash
+keytool -genkey -v -keystore ctf.keystore -alias ctf -keyalg RSA -keysize 2048 -validity 10000
+apksigner sign --ks ctf.keystore patched.apk
+```
+
+Install:
+
+```bash
+adb install -r patched.apk
+```
+
+---
+
+## 11. Native Library Detection
+
+Search:
+
+```java
+System.loadLibrary("native-lib")
+native boolean checkFlag(String s);
+```
+
+Then inspect:
+
+```bash
+find apk_out/lib -type f
+file apk_out/lib/*/*
+strings apk_out/lib/*/*
+```
+
+Open `.so` in Ghidra.
+
+Look for:
+
+```text
+JNI_OnLoad
+Java_com_package_Class_function
+strcmp
+memcmp
+strlen
+```
+
+---
+
+## 12. Native Function Names
+
+JNI pattern:
+
+```text
+Java_com_example_app_MainActivity_checkFlag
+```
+
+If stripped, search strings and xrefs.
+
+Useful:
+
+```bash
+nm -D libnative.so
+readelf -s libnative.so
+objdump -T libnative.so
+```
+
+---
+
+## 13. Dynamic Analysis
+
+Logs:
+
+```bash
+adb logcat | grep -i "ctf\|flag\|secret\|check"
+```
+
+Run activity:
+
+```bash
+adb shell am start -n com.package/.MainActivity
+```
+
+List package files:
+
+```bash
+adb shell pm path com.package
+```
+
+---
+
+## 14. Frida Basics
+
+Start app:
+
+```bash
+frida -U -f com.package.name
+```
+
+Hook Java method:
+
+```js
+Java.perform(function () {
+  var Main = Java.use("com.example.MainActivity");
+
+  Main.checkFlag.implementation = function (s) {
+    console.log("input = " + s);
+    var r = this.checkFlag(s);
+    console.log("result = " + r);
+    return true;
+  };
+});
+```
+
+Run:
+
+```bash
+frida -U -f com.package.name -l hook.js
+```
+
+---
+
+## 15. Hook Return Value
+
+Force success:
+
+```js
+Java.perform(function () {
+  var Main = Java.use("com.example.MainActivity");
+
+  Main.checkFlag.implementation = function (s) {
+    return true;
+  };
+});
+```
+
+---
+
+## 16. Hook Crypto
+
+```js
+Java.perform(function () {
+  var Base64 = Java.use("android.util.Base64");
+
+  Base64.decode.overload("java.lang.String", "int").implementation = function (a, b) {
+    console.log("Base64 input: " + a);
+    return this.decode(a, b);
+  };
+});
+```
+
+---
+
+## 17. Hook Native strcmp
+
+```js
+Interceptor.attach(Module.findExportByName(null, "strcmp"), {
+  onEnter: function (args) {
+    console.log("strcmp:");
+    console.log(args[0].readCString());
+    console.log(args[1].readCString());
+  }
+});
+```
+
+---
+
+## 18. Root / Emulator Checks
+
+Search:
+
+```text
+isRooted
+su
+magisk
+test-keys
+Build.TAGS
+/emulator
+frida
+debugger
+```
+
+Patch or hook:
+
+```js
+Java.perform(function () {
+  var File = Java.use("java.io.File");
+  File.exists.implementation = function () {
+    return false;
+  };
+});
+```
+
+---
+
+## 19. Intent / Exported Activity Abuse
+
+Check exported components:
+
+```bash
+aapt dump xmltree app.apk AndroidManifest.xml | grep -i exported -B5 -A5
+```
+
+Start hidden activity:
+
+```bash
+adb shell am start -n com.package/.SecretActivity
+```
+
+Send extra:
+
+```bash
+adb shell am start -n com.package/.MainActivity --es flag test
+```
+
+---
+
+## 20. Content Providers
+
+Check manifest:
+
+```text
+provider
+authorities
+exported=true
+```
+
+Query:
+
+```bash
+adb shell content query --uri content://authority/path
+```
+
+---
+
+## 21. SQLite Databases
+
+```bash
+adb shell run-as com.package.name
+cd /data/data/com.package.name/databases
+ls
+sqlite3 app.db
+.tables
+select * from users;
+```
+
+---
+
+## 22. WebView Challenges
+
+Search:
+
+```text
+WebView
+addJavascriptInterface
+loadUrl
+file://
+setJavaScriptEnabled
+```
+
+Check:
+
+```text
+assets/*.html
+assets/*.js
+```
+
+---
+
+## 23. Flutter Apps
+
+Signs:
+
+```text
+libflutter.so
+libapp.so
+flutter_assets/
+```
+
+Useful tools:
+
+```bash
+strings libapp.so
+blutter
+reFlutter
+```
+
+Search:
+
+```bash
+strings libapp.so | grep -i "flag\|ctf\|secret"
+```
+
+---
+
+## 24. React Native Apps
+
+Signs:
+
+```text
+assets/index.android.bundle
+```
+
+Extract/search:
+
+```bash
+grep -Rni "flag\|ctf\|secret" apk_out/assets/
+```
+
+Pretty print JS:
+
+```bash
+npx prettier index.android.bundle
+```
+
+---
+
+## 25. Unity Android
+
+Signs:
+
+```text
+assets/bin/Data/Managed/Assembly-CSharp.dll
+```
+
+Open with:
+
+```text
+dnSpy
+ILSpy
+```
+
+Search:
+
+```text
+flag
+check
+secret
+```
+
+---
+
+## 26. Obfuscation
+
+Obfuscated names:
+
+```text
+a.b.c
+a()
+b()
+c()
+```
+
+Do not panic.
+
+Focus on:
+
+```text
+strings
+crypto APIs
+comparison calls
+native methods
+UI button handlers
+```
+
+---
+
+## 27. Common Android CTF Patterns
+
+| Pattern            | What to do                    |
+| ------------------ | ----------------------------- |
+| Hardcoded flag     | Search strings/resources      |
+| Java checkFlag     | Read JADX                     |
+| Smali condition    | Patch branch                  |
+| Native JNI check   | Open `.so` in Ghidra          |
+| AES encrypted flag | Recover key/IV/ciphertext     |
+| Base64 flag        | Decode                        |
+| Root check         | Patch/hook                    |
+| Exported activity  | Start with adb                |
+| Hidden asset       | Check assets/res/raw          |
+| Flutter            | Inspect libapp.so             |
+| Unity              | Decompile Assembly-CSharp.dll |
+
+---
+
+# Fast Workflow
+
+```bash
+apktool d app.apk -o apk_out
+jadx-gui app.apk
+grep -Rni "flag\|ctf\|secret\|check\|verify" apk_out/
+find apk_out/assets apk_out/res/raw -type f
+find apk_out/lib -type f
+```
+
+Then decide:
+
+```text
+Java code?        → JADX
+Smali only?       → patch smali
+Native .so?       → Ghidra
+Crypto?           → Python solve
+Runtime check?    → Frida
+Hidden activity?  → adb am start
+```
+
+# Golden Rule
+
+For Android rev, always answer:
+
+1. Where does user input go?
+2. What method checks it?
+3. Is the flag in Java, resources, assets, or native `.so`?
+4. Can I reverse the logic, patch it, or hook it?
+
+That solves most Android CTF reversing challenges.
